@@ -8,7 +8,7 @@ environment {
 stages {
         stage('Checkout') {
             steps {
-                git url: 'https://github.com/mahmoud254/jenkins_nodejs_example.git', branch: 'master'
+                git url: 'https://github.com/Selhawary/pipline-ci-cd.git', branch: 'main'
             }
         }
         stage('Install Dependencies') {
