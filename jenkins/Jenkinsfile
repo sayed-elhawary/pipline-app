@@ -4,6 +4,12 @@ environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-cred') // Docker Hub credentials ID
         IMAGE_NAME = 'sayedkhaledelhawary/nodejs-vo' // Docker Hub username/repo
         IMAGE_TAG = "${env.BUILD_NUMBER}" // Use Jenkins build number as tag
+        CONTAINER_NAME = 'my-app'
+
+           
+    }
+triggers {
+        pollSCM('* * * * *') // Poll SCM every minute
     }
 stages {
         stage('Checkout') {
@@ -21,18 +27,21 @@ stages {
         }
         stage('Build Docker Image') {
             steps {
+                sh "docker stop ${CONTAINER_NAME}"
+                sh "docker rm ${CONTAINER_NAME}"
                 sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
             }
         }
         stage('Push to Docker Hub') {
             steps {
+
                 sh 'echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin'
                 sh "docker push ${IMAGE_NAME}:${IMAGE_TAG}"
             }
         }
         stage('Deploy') {
             steps {
-                sh "docker run -d -p 3000:3000 ${IMAGE_NAME}:${IMAGE_TAG}"
+                sh "docker run --name ${CONTAINER_NAME} -d -p  3000:3000 ${IMAGE_NAME}:${IMAGE_TAG}"
             }
         }
     }
@@ -42,4 +51,3 @@ stages {
         }
     }
 }
-
