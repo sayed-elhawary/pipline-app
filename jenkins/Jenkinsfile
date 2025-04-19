@@ -1,53 +1,65 @@
 pipeline {
     agent any
-environment {
-        DOCKERHUB_CREDENTIALS = credentials('dockerhub-cred') // Docker Hub credentials ID
-        IMAGE_NAME = 'sayedkhaledelhawary/nodejs-vo' // Docker Hub username/repo
-        IMAGE_TAG = "${env.BUILD_NUMBER}" // Use Jenkins build number as tag
+    tools {
+        jdk 'JDK21' // Must match Jenkins JDK configuration
+        maven 'Maven3' // Must match Jenkins Maven configuration
+    }
+    environment {
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub-cred')
+        IMAGE_NAME = 'sayedkhaledelhawary/nodejs-vo'
+        IMAGE_TAG = "${env.BUILD_NUMBER}"
         CONTAINER_NAME = 'my-app'
-
-           
     }
-triggers {
-        pollSCM('* * * * *') // Poll SCM every minute
+    triggers {
+        pollSCM('*/5 * * * *') // Poll every 5 minutes
     }
-stages {
+    stages {
         stage('Checkout') {
             steps {
-                git url: 'https://github.com/Selhawary/pipline-ci-cd.git', branch: 'main'
+                sh 'git clean -fdx' // Clean workspace to avoid stale files
+                git url: 'https://github.com/sayed-elhawary/pipline-app.git', branch: 'main'
             }
         }
         stage('Install Dependencies') {
             steps {
-                sh '''
-                cd /var/jenkins_home/workspace/a/nodeapp
-                npm install
-                   '''
+                dir('nodeapp') {
+                    sh 'npm install'
+                }
+            }
+        }
+        stage('Test') {
+            steps {
+                dir('javaapp') {
+                    sh 'cat pom.xml' // Verify pom.xml contents
+                    sh 'mvn clean test -e' // Run tests with detailed errors
+                }
             }
         }
         stage('Build Docker Image') {
             steps {
-                sh "docker stop ${CONTAINER_NAME}"
-                sh "docker rm ${CONTAINER_NAME}"
-                sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
+                dir('nodeapp') {
+                    sh "docker stop ${CONTAINER_NAME} || true"
+                    sh "docker rm ${CONTAINER_NAME} || true"
+                    sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
+                }
             }
         }
         stage('Push to Docker Hub') {
             steps {
-
                 sh 'echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin'
                 sh "docker push ${IMAGE_NAME}:${IMAGE_TAG}"
             }
         }
         stage('Deploy') {
             steps {
-                sh "docker run --name ${CONTAINER_NAME} -d -p  3000:3000 ${IMAGE_NAME}:${IMAGE_TAG}"
+                sh "docker run --name ${CONTAINER_NAME} -d -p 3000:3000 ${IMAGE_NAME}:${IMAGE_TAG}"
             }
         }
     }
     post {
         always {
-            sh 'docker logout'
+            sh 'docker logout || true'
+            sh 'docker image prune -f || true'
         }
     }
 }
